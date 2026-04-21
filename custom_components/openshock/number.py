@@ -20,13 +20,30 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     coordinator = entry.runtime_data[DATA_COORDINATOR]
+    known_ids: set[str] = set()
 
-    entities: list[NumberEntity] = []
-    for shocker in coordinator.data:
-        entities.append(OpenShockIntensityNumber(entry, coordinator, shocker))
-        entities.append(OpenShockDurationNumber(entry, coordinator, shocker))
+    def shocker_id(shocker: dict[str, Any]) -> str | None:
+        value = shocker.get("id") or shocker.get("shockerId") or shocker.get("shocker_id") or shocker.get("uuid")
+        return str(value) if value else None
 
-    async_add_entities(entities)
+    def build_new_entities() -> list[NumberEntity]:
+        entities: list[NumberEntity] = []
+        for shocker in coordinator.data:
+            current_id = shocker_id(shocker)
+            if not current_id or current_id in known_ids:
+                continue
+            known_ids.add(current_id)
+            entities.append(OpenShockIntensityNumber(entry, coordinator, shocker))
+            entities.append(OpenShockDurationNumber(entry, coordinator, shocker))
+        return entities
+
+    async_add_entities(build_new_entities())
+
+    entry.async_on_unload(
+        coordinator.async_add_listener(
+            lambda: async_add_entities(build_new_entities()),
+        )
+    )
 
 
 class _OpenShockBaseNumber(OpenShockEntity, NumberEntity):

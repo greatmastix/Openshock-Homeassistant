@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from aiohttp import ClientError, ClientSession
+from aiohttp import ClientError, ClientResponseError, ClientSession
 
 
 class OpenShockApiError(Exception):
@@ -31,23 +31,42 @@ class OpenShockApiClient:
         self._headers = {
             "OpenShockToken": token,
             "Open-Shock-Token": token,
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
             "Accept": "application/json",
             "User-Agent": user_agent,
         }
+
+    @staticmethod
+    def _error_message(payload: Any, fallback: str) -> str:
+        if isinstance(payload, dict):
+            for key in ("message", "detail", "title", "error"):
+                value = payload.get(key)
+                if value:
+                    return str(value)
+        return fallback
+
+    @staticmethod
+    def _unwrap_data(payload: Any) -> Any:
+        if isinstance(payload, dict) and "data" in payload:
+            return payload["data"]
+        return payload
 
     async def _request(self, method: str, path: str, *, json_body: dict[str, Any] | None = None) -> Any:
         url = f"{self._base_url}{path}"
         try:
             async with self._session.request(method, url, headers=self._headers, json=json_body) as resp:
-                if resp.status >= 400:
-                    text = await resp.text()
-                    raise OpenShockApiError(f"HTTP {resp.status} for {path}: {text[:250]}", status=resp.status)
+                content_type = (resp.content_type or "").lower()
+                if "json" in content_type:
+                    payload: Any = await resp.json(content_type=None)
+                else:
+                    payload = await resp.text()
 
-                if resp.content_type and "json" in resp.content_type:
-                    return await resp.json()
-                return await resp.text()
+                if resp.status >= 400:
+                    message = self._error_message(payload, str(payload)[:250])
+                    raise OpenShockApiError(f"HTTP {resp.status} for {path}: {message}", status=resp.status)
+
+                return payload
+        except ClientResponseError as err:
+            raise OpenShockApiError(f"Request failed for {path}: {err}", status=err.status) from err
         except ClientError as err:
             raise OpenShockApiError(f"Request failed for {path}: {err}") from err
 
@@ -64,8 +83,10 @@ class OpenShockApiClient:
 
     def _normalize_shockers(self, payload: Any) -> list[dict[str, Any]]:
         """Normalize possible API response shapes to a flat shocker list."""
+        payload = self._unwrap_data(payload)
+
         if isinstance(payload, dict):
-            for key in ("data", "shockers", "items", "devices", "hubs"):
+            for key in ("shockers", "items", "devices", "hubs"):
                 value = payload.get(key)
                 if isinstance(value, list):
                     return self._normalize_shockers(value)
@@ -94,7 +115,6 @@ class OpenShockApiClient:
                     flat.append(parsed)
                 continue
 
-            # Already a shocker object
             if self._extract_shocker_id(item):
                 flat.append(item)
 
@@ -109,9 +129,9 @@ class OpenShockApiClient:
                 shockers = self._normalize_shockers(payload)
                 if shockers:
                     return shockers
-                continue
             except OpenShockApiError as err:
                 last_exc = err
+
         if last_exc:
             raise last_exc
         return []
@@ -133,37 +153,38 @@ class OpenShockApiClient:
             "stop": "Stop",
         }.get(command.lower(), command)
 
-        control = {"id": shocker_id, "type": mapped_type}
+        control: dict[str, Any] = {"id": shocker_id, "type": mapped_type}
         if mapped_type != "Stop":
-            control["intensity"] = intensity if intensity is not None else 50
-            control["duration"] = duration_ms if duration_ms is not None else 1000
+            control["intensity"] = max(1, min(100, int(intensity if intensity is not None else 50)))
+            control["duration"] = max(100, min(30000, int(duration_ms if duration_ms is not None else 1000)))
 
-        payloads = [
-            {"shocks": [control]},
-            {
-                "shockerId": shocker_id,
-                "type": mapped_type,
-                "intensity": intensity,
-                "duration": duration_ms,
-            },
-        ]
-
-        attempts = [
-            ("POST", "/2/shockers/control"),
-            ("POST", "/1/shockers/control"),
-            ("POST", f"/1/shockers/{shocker_id}/control"),
-            ("POST", "/shockers/control"),
-        ]
+        v2_payload = {"shocks": [control]}
+        legacy_payload: dict[str, Any] = {
+            "shockerId": shocker_id,
+            "type": mapped_type,
+        }
+        if mapped_type != "Stop":
+            legacy_payload["intensity"] = control["intensity"]
+            legacy_payload["duration"] = control["duration"]
+        else:
+            # Some /1 API variants still validate these fields for Stop.
+            legacy_payload["intensity"] = 0
+            legacy_payload["duration"] = 300
 
         last_exc: Exception | None = None
-        for method, path in attempts:
-            for payload in payloads:
-                clean_payload = {k: v for k, v in payload.items() if v is not None}
-                try:
-                    await self._request(method, path, json_body=clean_payload)
-                    return
-                except OpenShockApiError as err:
-                    last_exc = err
+        attempts: tuple[tuple[str, dict[str, Any]], ...] = (
+            ("/2/shockers/control", v2_payload),
+            ("/1/shockers/control", v2_payload),
+            ("/1/shockers/control", legacy_payload),
+            (f"/1/shockers/{shocker_id}/control", legacy_payload),
+        )
+
+        for path, payload in attempts:
+            try:
+                await self._request("POST", path, json_body=payload)
+                return
+            except OpenShockApiError as err:
+                last_exc = err
 
         if last_exc:
             raise last_exc
