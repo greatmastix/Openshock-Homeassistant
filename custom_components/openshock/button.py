@@ -17,7 +17,6 @@ from .const import (
     ATTR_INTENSITY,
     COMMAND_SHOCK,
     COMMAND_SOUND,
-    COMMAND_STOP,
     COMMAND_VIBRATE,
     DATA_COORDINATOR,
     DATA_DEFAULTS,
@@ -38,7 +37,6 @@ BUTTONS: tuple[OpenShockButtonDescription, ...] = (
     OpenShockButtonDescription(key="shock", name="Shock", command=COMMAND_SHOCK),
     OpenShockButtonDescription(key="vibrate", name="Vibrate", command=COMMAND_VIBRATE),
     OpenShockButtonDescription(key="sound", name="Sound", command=COMMAND_SOUND),
-    OpenShockButtonDescription(key="stop", name="Stop", command=COMMAND_STOP),
 )
 
 
@@ -103,9 +101,6 @@ class OpenShockCommandButton(OpenShockEntity, ButtonEntity):
 
         intensity = defaults.get(ATTR_INTENSITY, DEFAULT_INTENSITY)
         duration_ms = defaults.get(ATTR_DURATION_MS, DEFAULT_DURATION_MS)
-        if self.entity_description.command == COMMAND_STOP:
-            intensity = None
-            duration_ms = None
 
         try:
             await self.coordinator.api.send_command(
