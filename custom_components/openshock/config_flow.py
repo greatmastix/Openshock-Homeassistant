@@ -33,8 +33,11 @@ class OpenShockConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             try:
                 await api.test_connection()
-            except OpenShockApiError:
-                errors["base"] = "cannot_connect"
+            except OpenShockApiError as err:
+                if err.status in (401, 403):
+                    errors["base"] = "invalid_auth"
+                else:
+                    errors["base"] = "cannot_connect"
             else:
                 return self.async_create_entry(title="OpenShock", data=user_input)
 

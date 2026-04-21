@@ -12,7 +12,8 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to OpenShock API"
+      "cannot_connect": "Failed to connect to OpenShock API",
+      "invalid_auth": "Authentication failed (check API token)"
     },
     "abort": {
       "already_configured": "This OpenShock endpoint is already configured"
