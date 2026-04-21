@@ -13,6 +13,10 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .const import DATA_COORDINATOR
 from .entity import OpenShockEntity
 
+STATUS_KEYS = ("status", "state", "connectionState")
+BATTERY_KEYS = ("battery", "batteryLevel", "battery_percent")
+RSSI_KEYS = ("rssi", "signal", "signalStrength")
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -23,11 +27,18 @@ async def async_setup_entry(
 
     entities: list[SensorEntity] = []
     for shocker in coordinator.data:
-        entities.append(OpenShockStatusSensor(coordinator, shocker))
-        entities.append(OpenShockBatterySensor(coordinator, shocker))
-        entities.append(OpenShockRssiSensor(coordinator, shocker))
+        if _has_any(shocker, STATUS_KEYS):
+            entities.append(OpenShockStatusSensor(coordinator, shocker))
+        if _has_any(shocker, BATTERY_KEYS):
+            entities.append(OpenShockBatterySensor(coordinator, shocker))
+        if _has_any(shocker, RSSI_KEYS):
+            entities.append(OpenShockRssiSensor(coordinator, shocker))
 
     async_add_entities(entities)
+
+
+def _has_any(data: dict[str, Any], keys: tuple[str, ...]) -> bool:
+    return any(data.get(key) is not None for key in keys)
 
 
 class _OpenShockBaseSensor(OpenShockEntity, SensorEntity):
@@ -49,7 +60,7 @@ class OpenShockStatusSensor(_OpenShockBaseSensor):
     @property
     def native_value(self) -> str:
         data = self.shocker or {}
-        for key in ("status", "state", "connectionState"):
+        for key in STATUS_KEYS:
             if data.get(key) is not None:
                 return str(data[key])
         return "unknown"
@@ -67,7 +78,7 @@ class OpenShockBatterySensor(_OpenShockBaseSensor):
     @property
     def native_value(self) -> float | None:
         data = self.shocker or {}
-        for key in ("battery", "batteryLevel", "battery_percent"):
+        for key in BATTERY_KEYS:
             value = data.get(key)
             if value is not None:
                 try:
@@ -89,7 +100,7 @@ class OpenShockRssiSensor(_OpenShockBaseSensor):
     @property
     def native_value(self) -> float | None:
         data = self.shocker or {}
-        for key in ("rssi", "signal", "signalStrength"):
+        for key in RSSI_KEYS:
             value = data.get(key)
             if value is not None:
                 try:

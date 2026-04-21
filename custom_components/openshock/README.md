@@ -1,31 +1,23 @@
-# OpenShock Home Assistant Integration
+# OpenShock for Home Assistant
 
-This custom integration provides:
+Simple custom integration to control OpenShock shockers from Home Assistant.
 
-- Automatic polling of shocker status/telemetry.
-- Per-shocker action buttons (Shock, Vibrate, Sound, Stop).
-- Per-shocker default intensity and duration controls.
-- Services for full command control (`openshock.send_command`, `openshock.stop_all`).
+## What it adds
 
-## Setup
+- **One device per shocker** (hubs are only used for discovery)
+- Command buttons: **Shock**, **Vibrate**, **Sound**, **Stop**
+- Per-shocker defaults: **Intensity** and **Duration**
+- Services:
+  - `openshock.send_command`
+  - `openshock.stop_all`
 
-1. Copy `custom_components/openshock` into your Home Assistant `custom_components` directory.
+## Install
+
+1. Copy `custom_components/openshock` into your Home Assistant `custom_components` folder.
 2. Restart Home Assistant.
-3. Add integration: **Settings → Devices & Services → Add Integration → OpenShock**.
-4. Provide API URL and API key.
+3. Go to **Settings → Devices & Services → Add Integration → OpenShock**.
+4. Enter your OpenShock API base URL and API token.
 
-## Notes
+## Disclosure
 
-Because OpenShock deployments may expose different endpoint variants, this integration includes endpoint/payload fallbacks for command and list APIs.
-
-## Troubleshooting
-
-If setup returns `cannot_connect` or `invalid_auth`:
-
-- Generate an API token from your OpenShock account (not your account password).
-- Ensure the integration points to your correct API base URL.
-- The integration sends `OpenShockToken` (plus compatibility auth headers) and uses the `GET /1/shockers/own` endpoint expected by current OpenShock SDKs.
-
-- Hub objects are only used for discovery context; entities/devices are created for individual shockers.
-
-- Control types use OpenShock values (`Shock`, `Vibrate`, `Sound`, `Stop`), with `beep` accepted as an alias for `Sound`.
+This project/integration scaffold was created with assistance from AI and then iterated based on real-device user feedback.
