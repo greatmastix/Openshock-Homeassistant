@@ -1,0 +1,36 @@
+send_command:
+  name: Send command
+  description: Send a command to a specific OpenShock shocker.
+  fields:
+    shocker_id:
+      required: true
+      selector:
+        text:
+    command:
+      required: true
+      selector:
+        select:
+          options:
+            - shock
+            - vibrate
+            - sound
+            - stop
+    intensity:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+    duration_ms:
+      required: false
+      selector:
+        number:
+          min: 100
+          max: 30000
+          step: 100
+          mode: box
+
+stop_all:
+  name: Stop all
+  description: Send an immediate stop command to all OpenShock shockers.

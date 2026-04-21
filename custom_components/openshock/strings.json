@@ -1,0 +1,32 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "OpenShock",
+        "description": "Configure your OpenShock account",
+        "data": {
+          "base_url": "API Base URL",
+          "api_key": "API Key",
+          "poll_interval": "Polling interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to OpenShock API",
+      "invalid_auth": "Authentication failed (check API token)"
+    },
+    "abort": {
+      "already_configured": "This OpenShock endpoint is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "OpenShock options",
+        "data": {
+          "poll_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  }
+}
