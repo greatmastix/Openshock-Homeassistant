@@ -63,10 +63,17 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 continue
 
             if any((DOMAIN, shocker_id) in device.identifiers for shocker_id in removed_ids):
-                device_registry.async_update_device(
-                    device_id=device.id,
-                    remove_config_entry_id=self._config_entry_id,
+                has_remaining_entities = any(
+                    entity.device_id == device.id and entity.config_entry_id == self._config_entry_id
+                    for entity in entity_registry.entities.values()
                 )
+                if has_remaining_entities:
+                    device_registry.async_update_device(
+                        device_id=device.id,
+                        remove_config_entry_id=self._config_entry_id,
+                    )
+                else:
+                    device_registry.async_remove_device(device.id)
 
     async def _async_update_data(self) -> list[dict[str, Any]]:
         try:
