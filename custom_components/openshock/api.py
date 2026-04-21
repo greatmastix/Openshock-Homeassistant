@@ -54,20 +54,62 @@ class OpenShockApiClient:
     async def test_connection(self) -> None:
         await self.get_shockers()
 
+    @staticmethod
+    def _extract_shocker_id(item: dict[str, Any]) -> str | None:
+        for key in ("id", "shockerId", "shocker_id", "uuid"):
+            value = item.get(key)
+            if value:
+                return str(value)
+        return None
+
+    def _normalize_shockers(self, payload: Any) -> list[dict[str, Any]]:
+        """Normalize possible API response shapes to a flat shocker list."""
+        if isinstance(payload, dict):
+            for key in ("data", "shockers", "items", "devices", "hubs"):
+                value = payload.get(key)
+                if isinstance(value, list):
+                    return self._normalize_shockers(value)
+            return []
+
+        if not isinstance(payload, list):
+            return []
+
+        flat: list[dict[str, Any]] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+
+            nested = item.get("shockers")
+            if isinstance(nested, list):
+                hub_id = item.get("id") or item.get("hubId") or item.get("deviceId")
+                hub_name = item.get("name") or item.get("hubName") or item.get("deviceName")
+                for shocker in nested:
+                    if not isinstance(shocker, dict):
+                        continue
+                    parsed = dict(shocker)
+                    if hub_id is not None:
+                        parsed.setdefault("hub_id", str(hub_id))
+                    if hub_name is not None:
+                        parsed.setdefault("hub_name", str(hub_name))
+                    flat.append(parsed)
+                continue
+
+            # Already a shocker object
+            if self._extract_shocker_id(item):
+                flat.append(item)
+
+        return flat
+
     async def get_shockers(self) -> list[dict[str, Any]]:
         """Fetch owned shockers."""
         last_exc: Exception | None = None
         for path in ("/1/shockers/own", "/1/shockers", "/shockers"):
             try:
                 payload = await self._request("GET", path)
-                if isinstance(payload, list):
-                    return payload
-                if isinstance(payload, dict):
-                    for key in ("data", "shockers", "items"):
-                        value = payload.get(key)
-                        if isinstance(value, list):
-                            return value
-                return []
+                shockers = self._normalize_shockers(payload)
+                if shockers:
+                    return shockers
+                continue
             except OpenShockApiError as err:
                 last_exc = err
         if last_exc:
@@ -130,7 +172,7 @@ class OpenShockApiClient:
         """Stop all owned shockers."""
         shockers = await self.get_shockers()
         for shocker in shockers:
-            shocker_id = str(shocker.get("id") or shocker.get("shockerId") or shocker.get("shocker_id") or "")
+            shocker_id = self._extract_shocker_id(shocker)
             if shocker_id:
                 await self.send_command(
                     shocker_id=shocker_id,

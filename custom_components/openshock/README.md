@@ -25,3 +25,5 @@ If setup returns `cannot_connect` or `invalid_auth`:
 - Generate an API token from your OpenShock account (not your account password).
 - Ensure the integration points to your correct API base URL.
 - The integration sends `OpenShockToken` (plus compatibility auth headers) and uses the `GET /1/shockers/own` endpoint expected by current OpenShock SDKs.
+
+- Hub objects are only used for discovery context; entities/devices are created for individual shockers.
