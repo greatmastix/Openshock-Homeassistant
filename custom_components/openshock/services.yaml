@@ -2,8 +2,13 @@ send_command:
   name: Send command
   description: Send a command to a specific OpenShock shocker.
   fields:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: openshock
     shocker_id:
-      required: true
+      required: false
       selector:
         text:
     command:

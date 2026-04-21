@@ -9,7 +9,7 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 - Device automation action: **Shock**, **Beep**, **Vibrate** with duration/intensity inputs
 - Per-shocker defaults: **Intensity** and **Duration**
 - Services:
-  - `openshock.send_command`
+  - `openshock.send_command` (accepts either `device_id` or `shocker_id`)
   - `openshock.stop_all`
 
 ## Install
