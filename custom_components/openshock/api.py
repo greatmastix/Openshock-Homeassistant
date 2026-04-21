@@ -10,24 +10,17 @@ from aiohttp import ClientError, ClientSession
 class OpenShockApiError(Exception):
     """Raised when OpenShock API fails."""
 
-    def __init__(self, message: str, *, status: int | None = None) -> None:
-        super().__init__(message)
-        self.status = status
-
 
 class OpenShockApiClient:
     """OpenShock API client with endpoint fallback support."""
 
-    def __init__(self, session: ClientSession, base_url: str, api_key: str, user_agent: str = "OpenShock-HomeAssistant/0.2.1") -> None:
+    def __init__(self, session: ClientSession, base_url: str, api_key: str) -> None:
         self._session = session
         self._base_url = base_url.rstrip("/")
-        token = api_key.removeprefix("Bearer ").strip()
         self._headers = {
-            "Open-Shock-Token": token,
-            "Authorization": f"Bearer {token}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": user_agent,
         }
 
     async def _request(self, method: str, path: str, *, json_body: dict[str, Any] | None = None) -> Any:
@@ -36,7 +29,7 @@ class OpenShockApiClient:
             async with self._session.request(method, url, headers=self._headers, json=json_body) as resp:
                 if resp.status >= 400:
                     text = await resp.text()
-                    raise OpenShockApiError(f"HTTP {resp.status} for {path}: {text[:250]}", status=resp.status)
+                    raise OpenShockApiError(f"HTTP {resp.status} for {path}: {text[:250]}")
 
                 if resp.content_type and "json" in resp.content_type:
                     return await resp.json()
