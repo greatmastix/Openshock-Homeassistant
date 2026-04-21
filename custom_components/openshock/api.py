@@ -128,8 +128,8 @@ class OpenShockApiClient:
         mapped_type = {
             "shock": "Shock",
             "vibrate": "Vibrate",
-            "sound": "Beep",
-            "beep": "Beep",
+            "sound": "Sound",
+            "beep": "Sound",
             "stop": "Stop",
         }.get(command.lower(), command)
 

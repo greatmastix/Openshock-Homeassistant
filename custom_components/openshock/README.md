@@ -27,3 +27,5 @@ If setup returns `cannot_connect` or `invalid_auth`:
 - The integration sends `OpenShockToken` (plus compatibility auth headers) and uses the `GET /1/shockers/own` endpoint expected by current OpenShock SDKs.
 
 - Hub objects are only used for discovery context; entities/devices are created for individual shockers.
+
+- Control types use OpenShock values (`Shock`, `Vibrate`, `Sound`, `Stop`), with `beep` accepted as an alias for `Sound`.
