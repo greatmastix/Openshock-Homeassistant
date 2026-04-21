@@ -6,7 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.const import ATTR_DEVICE_ID, CONF_DOMAIN, CONF_TYPE
+from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_TYPE
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.selector import (
@@ -48,7 +48,7 @@ TYPE_TO_COMMAND = {
 ACTION_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_DOMAIN): DOMAIN,
-        vol.Required(ATTR_DEVICE_ID): cv.string,
+        vol.Required(CONF_DEVICE_ID): cv.string,
         vol.Required(CONF_TYPE): ACTION_SEND,
         vol.Optional("command_type", default=COMMAND_TYPE_SHOCK): vol.In(COMMAND_TYPES),
         vol.Optional(ATTR_INTENSITY, default=DEFAULT_INTENSITY): vol.All(
@@ -78,7 +78,7 @@ async def async_get_actions(hass: HomeAssistant, device_id: str) -> list[dict[st
     if _async_get_shocker_id(hass, device_id) is None:
         return []
 
-    return [{CONF_DOMAIN: DOMAIN, ATTR_DEVICE_ID: device_id, CONF_TYPE: ACTION_SEND}]
+    return [{CONF_DOMAIN: DOMAIN, CONF_DEVICE_ID: device_id, CONF_TYPE: ACTION_SEND}]
 
 
 async def async_validate_action_config(hass: HomeAssistant, config: dict[str, Any]) -> dict[str, Any]:
@@ -94,7 +94,7 @@ async def async_call_action_from_config(
 ) -> None:
     """Execute an OpenShock device action."""
     config = ACTION_SCHEMA(config)
-    shocker_id = _async_get_shocker_id(hass, config[ATTR_DEVICE_ID])
+    shocker_id = _async_get_shocker_id(hass, config[CONF_DEVICE_ID])
 
     if shocker_id is None:
         return
