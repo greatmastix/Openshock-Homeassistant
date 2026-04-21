@@ -23,7 +23,7 @@ class OpenShockApiClient:
         session: ClientSession,
         base_url: str,
         api_key: str,
-        user_agent: str = "OpenShock-HomeAssistant/0.2.1",
+        user_agent: str = "OpenShock-HomeAssistant/0.2.2",
     ) -> None:
         self._session = session
         self._base_url = base_url.rstrip("/")
