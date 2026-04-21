@@ -5,9 +5,10 @@ from __future__ import annotations
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import OpenShockApiClient, OpenShockApiError
@@ -32,9 +33,25 @@ from .const import (
 )
 from .coordinator import OpenShockDataCoordinator
 
+
+
+def _resolve_shocker_id_from_device(hass: HomeAssistant, device_id: str) -> str | None:
+    """Resolve OpenShock shocker id from a Home Assistant device id."""
+    device = dr.async_get(hass).async_get(device_id)
+    if device is None:
+        return None
+
+    for identifier_domain, identifier_id in device.identifiers:
+        if identifier_domain == DOMAIN:
+            return identifier_id
+
+    return None
+
+
 SEND_COMMAND_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_SHOCKER_ID): cv.string,
+        vol.Optional(ATTR_SHOCKER_ID): cv.string,
+        vol.Optional(CONF_DEVICE_ID): cv.string,
         vol.Required(ATTR_COMMAND): vol.In(VALID_COMMANDS),
         vol.Optional(ATTR_INTENSITY): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
         vol.Optional(ATTR_DURATION_MS): vol.All(vol.Coerce(int), vol.Range(min=100, max=30000)),
@@ -64,7 +81,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     async def async_send_command(call: ServiceCall) -> None:
-        shocker_id = call.data[ATTR_SHOCKER_ID]
+        shocker_id = call.data.get(ATTR_SHOCKER_ID)
+        if shocker_id is None and (device_id := call.data.get(CONF_DEVICE_ID)) is not None:
+            shocker_id = _resolve_shocker_id_from_device(hass, device_id)
+
+        if shocker_id is None:
+            raise HomeAssistantError("Provide shocker_id or device_id for openshock.send_command")
+
         command = call.data[ATTR_COMMAND]
 
         defaults = entry.runtime_data[DATA_DEFAULTS].get(shocker_id, {})
