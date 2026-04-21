@@ -10,7 +10,6 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 - Services:
   - `openshock.send_command`
   - `openshock.stop_all`
-- Optional telemetry sensors (**only** if API provides them): Status, Battery, RSSI
 
 ## Install
 
@@ -18,12 +17,6 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 2. Restart Home Assistant.
 3. Go to **Settings → Devices & Services → Add Integration → OpenShock**.
 4. Enter your OpenShock API base URL and API token.
-
-## Quick troubleshoot
-
-- Use an **API token** (not your account password).
-- If setup fails, verify your API base URL is correct.
-- Sound actions use OpenShock `Sound` control type (`beep` is accepted as alias).
 
 ## Disclosure
 
