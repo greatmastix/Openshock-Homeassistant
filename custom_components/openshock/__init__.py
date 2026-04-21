@@ -55,6 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass=hass,
         api=api,
         poll_interval=entry.options.get(CONF_POLL_INTERVAL, entry.data[CONF_POLL_INTERVAL]),
+        config_entry_id=entry.entry_id,
     )
     await coordinator.async_config_entry_first_refresh()
 
