@@ -13,6 +13,9 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
 )
 
 from .const import (
@@ -29,22 +32,25 @@ from .const import (
     SERVICE_SEND_COMMAND,
 )
 
-ACTION_SHOCK = "shock"
-ACTION_BEEP = "beep"
-ACTION_VIBRATE = "vibrate"
+ACTION_SEND = "send"
 
-ACTIONS = (ACTION_SHOCK, ACTION_BEEP, ACTION_VIBRATE)
-ACTION_TO_COMMAND = {
-    ACTION_SHOCK: COMMAND_SHOCK,
-    ACTION_BEEP: COMMAND_SOUND,
-    ACTION_VIBRATE: COMMAND_VIBRATE,
+COMMAND_TYPE_SHOCK = "shock"
+COMMAND_TYPE_BEEP = "beep"
+COMMAND_TYPE_VIBRATE = "vibrate"
+
+COMMAND_TYPES = (COMMAND_TYPE_SHOCK, COMMAND_TYPE_BEEP, COMMAND_TYPE_VIBRATE)
+TYPE_TO_COMMAND = {
+    COMMAND_TYPE_SHOCK: COMMAND_SHOCK,
+    COMMAND_TYPE_BEEP: COMMAND_SOUND,
+    COMMAND_TYPE_VIBRATE: COMMAND_VIBRATE,
 }
 
 ACTION_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_DOMAIN): DOMAIN,
         vol.Required(ATTR_DEVICE_ID): cv.string,
-        vol.Required(CONF_TYPE): vol.In(ACTIONS),
+        vol.Required(CONF_TYPE): ACTION_SEND,
+        vol.Optional("command_type", default=COMMAND_TYPE_SHOCK): vol.In(COMMAND_TYPES),
         vol.Optional(ATTR_INTENSITY, default=DEFAULT_INTENSITY): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=100)
         ),
@@ -72,14 +78,7 @@ async def async_get_actions(hass: HomeAssistant, device_id: str) -> list[dict[st
     if _async_get_shocker_id(hass, device_id) is None:
         return []
 
-    return [
-        {
-            CONF_DOMAIN: DOMAIN,
-            ATTR_DEVICE_ID: device_id,
-            CONF_TYPE: action,
-        }
-        for action in ACTIONS
-    ]
+    return [{CONF_DOMAIN: DOMAIN, ATTR_DEVICE_ID: device_id, CONF_TYPE: ACTION_SEND}]
 
 
 async def async_validate_action_config(hass: HomeAssistant, config: dict[str, Any]) -> dict[str, Any]:
@@ -105,7 +104,7 @@ async def async_call_action_from_config(
         SERVICE_SEND_COMMAND,
         {
             ATTR_SHOCKER_ID: shocker_id,
-            ATTR_COMMAND: ACTION_TO_COMMAND[config[CONF_TYPE]],
+            ATTR_COMMAND: TYPE_TO_COMMAND[config["command_type"]],
             ATTR_INTENSITY: config[ATTR_INTENSITY],
             ATTR_DURATION_MS: config[ATTR_DURATION_MS],
         },
@@ -122,6 +121,16 @@ async def async_get_action_capabilities(
     return {
         "extra_fields": vol.Schema(
             {
+                vol.Optional("command_type", default=COMMAND_TYPE_SHOCK): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            {"value": COMMAND_TYPE_SHOCK, "label": "Shock"},
+                            {"value": COMMAND_TYPE_BEEP, "label": "Beep"},
+                            {"value": COMMAND_TYPE_VIBRATE, "label": "Vibrate"},
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN
+                    )
+                ),
                 vol.Optional(ATTR_INTENSITY, default=DEFAULT_INTENSITY): NumberSelector(
                     NumberSelectorConfig(min=1, max=100, step=1, mode=NumberSelectorMode.SLIDER)
                 ),
