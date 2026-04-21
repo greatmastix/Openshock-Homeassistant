@@ -6,6 +6,7 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -41,7 +42,7 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         return None
 
     async def _async_remove_deleted_shocker_entities(self, removed_ids: set[str]) -> None:
-        """Remove entities for shockers that no longer exist."""
+        """Remove entities/devices for shockers that no longer exist."""
         if not removed_ids:
             return
 
@@ -55,6 +56,17 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 for shocker_id in removed_ids
             ):
                 entity_registry.async_remove(entry.entity_id)
+
+        device_registry = dr.async_get(self.hass)
+        for device in list(device_registry.devices.values()):
+            if self._config_entry_id not in device.config_entries:
+                continue
+
+            if any((DOMAIN, shocker_id) in device.identifiers for shocker_id in removed_ids):
+                device_registry.async_update_device(
+                    device_id=device.id,
+                    remove_config_entry_id=self._config_entry_id,
+                )
 
     async def _async_update_data(self) -> list[dict[str, Any]]:
         try:
