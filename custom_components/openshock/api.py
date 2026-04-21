@@ -158,28 +158,10 @@ class OpenShockApiClient:
             control["intensity"] = max(1, min(100, int(intensity if intensity is not None else 50)))
             control["duration"] = max(100, min(30000, int(duration_ms if duration_ms is not None else 1000)))
 
-        v2_payload = {"shocks": [control]}
-        legacy_payload: dict[str, Any] = {
-            "shockerId": shocker_id,
-            "type": mapped_type,
-        }
-        if mapped_type != "Stop":
-            legacy_payload["intensity"] = control["intensity"]
-            legacy_payload["duration"] = control["duration"]
-        else:
-            # Some /1 API variants still validate these fields for Stop.
-            legacy_payload["intensity"] = 0
-            legacy_payload["duration"] = 300
+        payload = {"shocks": [control]}
 
         last_exc: Exception | None = None
-        attempts: tuple[tuple[str, dict[str, Any]], ...] = (
-            ("/2/shockers/control", v2_payload),
-            ("/1/shockers/control", v2_payload),
-            ("/1/shockers/control", legacy_payload),
-            (f"/1/shockers/{shocker_id}/control", legacy_payload),
-        )
-
-        for path, payload in attempts:
+        for path in ("/2/shockers/control", "/1/shockers/control"):
             try:
                 await self._request("POST", path, json_body=payload)
                 return
