@@ -58,6 +58,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_entry_id=entry.entry_id,
     )
     await coordinator.async_config_entry_first_refresh()
+    await coordinator.async_prune_stale_registry_entries()
 
     entry.runtime_data = {DATA_COORDINATOR: coordinator, DATA_DEFAULTS: {}}
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -75,6 +75,35 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 else:
                     device_registry.async_remove_device(device.id)
 
+    async def async_prune_stale_registry_entries(self) -> None:
+        """Prune stale entities/devices after startup reloads."""
+        current_ids = {
+            shocker_id
+            for item in (self.data or [])
+            if (shocker_id := self._extract_shocker_id(item)) is not None
+        }
+
+        device_registry = dr.async_get(self.hass)
+        stale_device_ids = {
+            device.id
+            for device in device_registry.devices.values()
+            if self._config_entry_id in device.config_entries
+            and any(identifier[0] == DOMAIN and identifier[1] not in current_ids for identifier in device.identifiers)
+        }
+
+        if not stale_device_ids:
+            return
+
+        entity_registry = er.async_get(self.hass)
+        for entry in list(entity_registry.entities.values()):
+            if entry.platform != DOMAIN or entry.config_entry_id != self._config_entry_id:
+                continue
+            if entry.device_id in stale_device_ids:
+                entity_registry.async_remove(entry.entity_id)
+
+        for device_id in stale_device_ids:
+            device_registry.async_remove_device(device_id)
+
     async def _async_update_data(self) -> list[dict[str, Any]]:
         try:
             data = await self.api.get_shockers()
