@@ -23,6 +23,7 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 
 - Use an **API token** (not your account password).
 - If setup fails, verify your API base URL is correct.
+- API auth follows OpenShock token headers (`OpenShockToken` / `Open-Shock-Token`) and uses the V2 control endpoint first.
 - Sound actions use OpenShock `Sound` control type (`beep` is accepted as alias).
 
 ## Disclosure
