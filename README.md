@@ -10,10 +10,6 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 - Services:
   - `openshock.send_command`
   - `openshock.stop_all`
-- Optional telemetry sensors (**only** if API provides them):
-  - Status
-  - Battery
-  - RSSI
 
 ## Install
 
