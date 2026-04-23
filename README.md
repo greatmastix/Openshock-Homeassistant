@@ -25,8 +25,7 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 A lightweight Lovelace custom card is bundled with the integration.
 It calls `openshock.send_command` with `device_id` so you can target the **shocker device directly** (no shocker ID lookup needed in your dashboard YAML).
 
-The integration serves and registers the card JavaScript automatically at startup.
-You can add it from the dashboard UI with a visual editor (including an OpenShock device selector), or with YAML as:
+The integration serves and registers the card JavaScript automatically at startup, so you can add it directly in dashboards as:
 
 ```yaml
 type: custom:openshock-shocker-card
