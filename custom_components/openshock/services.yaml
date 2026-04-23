@@ -31,7 +31,7 @@ send_command:
       required: false
       selector:
         number:
-          min: 100
+          min: 300
           max: 30000
           step: 100
           mode: box

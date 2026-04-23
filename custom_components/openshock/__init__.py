@@ -54,7 +54,7 @@ SEND_COMMAND_SCHEMA = vol.Schema(
         vol.Optional(CONF_DEVICE_ID): cv.string,
         vol.Required(ATTR_COMMAND): vol.In(VALID_COMMANDS),
         vol.Optional(ATTR_INTENSITY): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
-        vol.Optional(ATTR_DURATION_MS): vol.All(vol.Coerce(int), vol.Range(min=100, max=30000)),
+        vol.Optional(ATTR_DURATION_MS): vol.All(vol.Coerce(int), vol.Range(min=300, max=30000)),
     }
 )
 

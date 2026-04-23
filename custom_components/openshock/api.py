@@ -23,7 +23,7 @@ class OpenShockApiClient:
         session: ClientSession,
         base_url: str,
         api_key: str,
-        user_agent: str = "OpenShock-HomeAssistant/0.2.2",
+        user_agent: str = "OpenShock-HomeAssistant/0.2.4",
     ) -> None:
         self._session = session
         self._base_url = base_url.rstrip("/")
@@ -154,9 +154,14 @@ class OpenShockApiClient:
         }.get(command.lower(), command)
 
         control: dict[str, Any] = {"id": shocker_id, "type": mapped_type}
-        if mapped_type != "Stop":
+        if mapped_type == "Stop":
+            # OpenShock's control schema always requires intensity and duration,
+            # even when control type is Stop.
+            control["intensity"] = 0
+            control["duration"] = 300
+        else:
             control["intensity"] = max(1, min(100, int(intensity if intensity is not None else 50)))
-            control["duration"] = max(100, min(30000, int(duration_ms if duration_ms is not None else 1000)))
+            control["duration"] = max(300, min(30000, int(duration_ms if duration_ms is not None else 1000)))
 
         payload = {"shocks": [control]}
 
