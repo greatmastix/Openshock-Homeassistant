@@ -153,15 +153,23 @@ class OpenShockApiClient:
             "stop": "Stop",
         }.get(command.lower(), command)
 
-        control: dict[str, Any] = {"id": shocker_id, "type": mapped_type}
-        if mapped_type != "Stop":
-            control["intensity"] = max(1, min(100, int(intensity if intensity is not None else 50)))
-            control["duration"] = max(100, min(30000, int(duration_ms if duration_ms is not None else 1000)))
+        normalized_intensity = int(intensity if intensity is not None else (0 if mapped_type == "Stop" else 50))
+        normalized_duration = int(duration_ms if duration_ms is not None else (300 if mapped_type == "Stop" else 1000))
 
-        payload = {"shocks": [control]}
+        control: dict[str, Any] = {
+            "id": shocker_id,
+            "type": mapped_type,
+            "intensity": max(0, min(100, normalized_intensity)),
+            "duration": max(300, min(65535, normalized_duration)),
+        }
 
         last_exc: Exception | None = None
         for path in ("/2/shockers/control", "/1/shockers/control"):
+            payload: dict[str, Any] | list[dict[str, Any]]
+            if path.startswith("/2/"):
+                payload = {"shocks": [control]}
+            else:
+                payload = [control]
             try:
                 await self._request("POST", path, json_body=payload)
                 return
