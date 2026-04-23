@@ -1,4 +1,28 @@
+function fireEvent(node, type, detail, options) {
+  options = options || {};
+  const event = new Event(type, {
+    bubbles: options.bubbles ?? true,
+    cancelable: Boolean(options.cancelable),
+    composed: options.composed ?? true,
+  });
+  event.detail = detail;
+  node.dispatchEvent(event);
+  return event;
+}
+
 class OpenShockShockerCard extends HTMLElement {
+  static async getConfigElement() {
+    return document.createElement('openshock-shocker-card-editor');
+  }
+
+  static getStubConfig() {
+    return {
+      title: 'OpenShock Shocker',
+      intensity: 50,
+      duration_ms: 1000,
+    };
+  }
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -9,11 +33,7 @@ class OpenShockShockerCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config || !config.device_id) {
-      throw new Error('OpenShock Shocker card requires a device_id');
-    }
-
-    this._config = config;
+    this._config = config || {};
     this._intensity = Number(config.intensity ?? 50);
     this._duration = Number(config.duration_ms ?? 1000);
     this._render();
@@ -68,6 +88,7 @@ class OpenShockShockerCard extends HTMLElement {
     }
 
     const title = this._config.title ?? 'OpenShock Shocker';
+    const hasDevice = Boolean(this._config.device_id);
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -137,6 +158,8 @@ class OpenShockShockerCard extends HTMLElement {
           <input id="duration" type="range" min="100" max="30000" step="100" value="${this._duration}" />
         </div>
 
+        ${hasDevice ? '' : '<p style="margin: 0 0 12px 0; color: var(--secondary-text-color);">Select an OpenShock device in the card editor to enable controls.</p>'}
+
         <div class="buttons">
           <button class="primary" id="shock">Shock</button>
           <button id="vibrate">Vibrate</button>
@@ -161,11 +184,135 @@ class OpenShockShockerCard extends HTMLElement {
   }
 }
 
-customElements.define('openshock-shocker-card', OpenShockShockerCard);
+class OpenShockShockerCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._config = {};
+    this._hass = null;
+  }
+
+  setConfig(config) {
+    this._config = config || {};
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _updateConfig(key, value) {
+    const config = { ...this._config };
+    if (value === '' || value === null || value === undefined) {
+      delete config[key];
+    } else {
+      config[key] = value;
+    }
+
+    this._config = config;
+    fireEvent(this, 'config-changed', { config });
+  }
+
+  _render() {
+    if (!this.shadowRoot) {
+      return;
+    }
+
+    const title = this._config.title ?? '';
+    const intensity = Number(this._config.intensity ?? 50);
+    const duration = Number(this._config.duration_ms ?? 1000);
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        .root {
+          display: grid;
+          gap: 12px;
+        }
+
+        .field {
+          display: grid;
+          gap: 4px;
+        }
+
+        label {
+          font-size: 0.9rem;
+          color: var(--secondary-text-color);
+        }
+
+        input {
+          padding: 8px;
+          border-radius: 8px;
+          border: 1px solid var(--divider-color);
+          background: var(--card-background-color);
+          color: var(--primary-text-color);
+        }
+      </style>
+      <div class="root">
+        <div class="field">
+          <label>Shocker device</label>
+          <ha-selector id="device_id"></ha-selector>
+        </div>
+        <div class="field">
+          <label>Title (optional)</label>
+          <input id="title" type="text" value="${title}" placeholder="OpenShock Shocker" />
+        </div>
+        <div class="field">
+          <label>Default intensity (1-100)</label>
+          <input id="intensity" type="number" min="1" max="100" value="${intensity}" />
+        </div>
+        <div class="field">
+          <label>Default duration ms (100-30000)</label>
+          <input id="duration_ms" type="number" min="100" max="30000" step="100" value="${duration}" />
+        </div>
+      </div>
+    `;
+
+    const selector = this.shadowRoot.getElementById('device_id');
+    selector.hass = this._hass;
+    selector.selector = {
+      device: {
+        integration: 'openshock',
+      },
+    };
+    selector.value = this._config.device_id ?? '';
+    selector.addEventListener('value-changed', (event) => {
+      this._updateConfig('device_id', event.detail.value);
+    });
+
+    this.shadowRoot.getElementById('title')?.addEventListener('change', (event) => {
+      this._updateConfig('title', event.target.value);
+    });
+
+    this.shadowRoot.getElementById('intensity')?.addEventListener('change', (event) => {
+      const value = Number(event.target.value);
+      if (Number.isFinite(value)) {
+        this._updateConfig('intensity', Math.min(100, Math.max(1, value)));
+      }
+    });
+
+    this.shadowRoot.getElementById('duration_ms')?.addEventListener('change', (event) => {
+      const value = Number(event.target.value);
+      if (Number.isFinite(value)) {
+        this._updateConfig('duration_ms', Math.min(30000, Math.max(100, value)));
+      }
+    });
+  }
+}
+
+if (!customElements.get('openshock-shocker-card')) {
+  customElements.define('openshock-shocker-card', OpenShockShockerCard);
+}
+
+if (!customElements.get('openshock-shocker-card-editor')) {
+  customElements.define('openshock-shocker-card-editor', OpenShockShockerCardEditor);
+}
 
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'openshock-shocker-card',
-  name: 'OpenShock Shocker Card',
-  description: 'Control an OpenShock device by Home Assistant device id.',
-});
+if (!window.customCards.find((card) => card.type === 'openshock-shocker-card')) {
+  window.customCards.push({
+    type: 'openshock-shocker-card',
+    name: 'OpenShock Shocker Card',
+    description: 'Control an OpenShock device by Home Assistant device id.',
+  });
+}
