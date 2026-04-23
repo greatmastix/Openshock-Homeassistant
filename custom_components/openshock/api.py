@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
 
@@ -75,10 +76,16 @@ class OpenShockApiClient:
 
     @staticmethod
     def _extract_shocker_id(item: dict[str, Any]) -> str | None:
-        for key in ("id", "shockerId", "shocker_id", "uuid"):
+        for key in ("shockerId", "shocker_id", "uuid", "id"):
             value = item.get(key)
-            if value:
-                return str(value)
+            if not value:
+                continue
+
+            candidate = str(value).strip()
+            try:
+                return str(UUID(candidate))
+            except ValueError:
+                continue
         return None
 
     def _normalize_shockers(self, payload: Any) -> list[dict[str, Any]]:
@@ -160,7 +167,7 @@ class OpenShockApiClient:
             control["duration"] = 300
         else:
             control["intensity"] = max(1, min(100, int(intensity if intensity is not None else 50)))
-            control["duration"] = max(300, min(30000, int(duration_ms if duration_ms is not None else 1000)))
+            control["duration"] = max(300, min(65535, int(duration_ms if duration_ms is not None else 1000)))
 
         last_exc: Exception | None = None
         for path in ("/2/shockers/control", "/1/shockers/control"):
