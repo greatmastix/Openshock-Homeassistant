@@ -19,6 +19,25 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 3. Go to **Settings → Devices & Services → Add Integration → OpenShock**.
 4. Enter your OpenShock API base URL and API token.
 
+
+## Dashboard custom card (device-targeted)
+
+A lightweight Lovelace custom card is bundled with the integration.
+It calls `openshock.send_command` with `device_id` so you can target the **shocker device directly** (no shocker ID lookup needed in your dashboard YAML).
+
+The integration serves and registers the card JavaScript automatically at startup.
+You can add it from the dashboard UI with a visual editor (including an OpenShock device selector), or with YAML as:
+
+```yaml
+type: custom:openshock-shocker-card
+title: Desk Shocker
+device_id: 1234567890abcdef1234567890abcdef
+intensity: 50
+duration_ms: 1000
+```
+
+> Tip: In Home Assistant, you can find the `device_id` in **Developer Tools → Actions**, by selecting `openshock.send_command` and choosing your device from the device selector.
+
 ## Quick troubleshoot
 
 - Use an **API token** (not your account password).
