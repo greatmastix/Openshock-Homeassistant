@@ -22,14 +22,10 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 
 ## Dashboard custom card (device-targeted)
 
-A lightweight Lovelace custom card is included at `www/openshock-shocker-card.js`.
+A lightweight Lovelace custom card is bundled with the integration.
 It calls `openshock.send_command` with `device_id` so you can target the **shocker device directly** (no shocker ID lookup needed in your dashboard YAML).
 
-1. Copy `www/openshock-shocker-card.js` into your Home Assistant `www/` folder (or use the repo file directly if your setup already serves it).
-2. Add this as a Lovelace resource:
-   - URL: `/local/openshock-shocker-card.js`
-   - Type: `JavaScript Module`
-3. Add a card:
+The integration serves and registers the card JavaScript automatically at startup, so you can add it directly in dashboards as:
 
 ```yaml
 type: custom:openshock-shocker-card
@@ -40,14 +36,6 @@ duration_ms: 1000
 ```
 
 > Tip: In Home Assistant, you can find the `device_id` in **Developer Tools → Actions**, by selecting `openshock.send_command` and choosing your device from the device selector.
-
-
-### Why is a Lovelace resource still required?
-
-Home Assistant only shows custom cards in **Add Card / Add Widget** after the frontend JavaScript module is loaded as a Lovelace resource.
-This is a Home Assistant frontend rule for all custom cards (integration-provided or not).
-
-If you want zero custom resource setup, use the integration's built-in entities/buttons directly in dashboards instead of a custom card.
 
 ## Quick troubleshoot
 

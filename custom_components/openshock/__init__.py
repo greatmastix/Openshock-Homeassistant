@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import voluptuous as vol
 
+from homeassistant.components import frontend
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -33,7 +37,9 @@ from .const import (
 )
 from .coordinator import OpenShockDataCoordinator
 
-
+_CARD_URL = "/openshock/openshock-shocker-card.js"
+_CARD_PATH = Path(__file__).parent / "frontend" / "openshock-shocker-card.js"
+_DATA_CARD_REGISTERED = "card_registered"
 
 def _resolve_shocker_id_from_device(hass: HomeAssistant, device_id: str) -> str | None:
     """Resolve OpenShock shocker id from a Home Assistant device id."""
@@ -61,6 +67,14 @@ SEND_COMMAND_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up OpenShock from a config entry."""
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if not domain_data.get(_DATA_CARD_REGISTERED):
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(_CARD_URL, str(_CARD_PATH), cache_headers=False)]
+        )
+        frontend.add_extra_js_url(hass, _CARD_URL)
+        domain_data[_DATA_CARD_REGISTERED] = True
+
     session = async_get_clientsession(hass)
     api = OpenShockApiClient(
         session=session,
@@ -135,5 +149,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unloaded and len(hass.config_entries.async_entries(DOMAIN)) <= 1:
         hass.services.async_remove(DOMAIN, SERVICE_SEND_COMMAND)
         hass.services.async_remove(DOMAIN, SERVICE_STOP_ALL)
+
+        domain_data = hass.data.get(DOMAIN, {})
+        if domain_data.get(_DATA_CARD_REGISTERED):
+            frontend.remove_extra_js_url(hass, _CARD_URL)
+            domain_data.pop(_DATA_CARD_REGISTERED, None)
 
     return unloaded
