@@ -10,7 +10,8 @@ CONF_API_KEY = "api_key"
 CONF_POLL_INTERVAL = "poll_interval"
 
 DEFAULT_BASE_URL = "https://api.openshock.app"
-DEFAULT_POLL_INTERVAL = 15
+MIN_POLL_INTERVAL = 300
+DEFAULT_POLL_INTERVAL = 3600
 
 DATA_COORDINATOR = "coordinator"
 DATA_DEFAULTS = "defaults"

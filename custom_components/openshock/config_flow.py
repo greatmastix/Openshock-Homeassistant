@@ -11,7 +11,15 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import OpenShockApiClient, OpenShockApiError
-from .const import CONF_API_KEY, CONF_BASE_URL, CONF_POLL_INTERVAL, DEFAULT_BASE_URL, DEFAULT_POLL_INTERVAL, DOMAIN
+from .const import (
+    CONF_API_KEY,
+    CONF_BASE_URL,
+    CONF_POLL_INTERVAL,
+    DEFAULT_BASE_URL,
+    DEFAULT_POLL_INTERVAL,
+    DOMAIN,
+    MIN_POLL_INTERVAL,
+)
 
 
 class OpenShockConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -47,7 +55,7 @@ class OpenShockConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_API_KEY): str,
                 vol.Required(CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL): vol.All(
                     vol.Coerce(int),
-                    vol.Range(min=5, max=300),
+                    vol.Range(min=MIN_POLL_INTERVAL, max=86400),
                 ),
             }
         )
@@ -81,7 +89,7 @@ class OpenShockOptionsFlow(config_entries.OptionsFlow):
                         CONF_POLL_INTERVAL,
                         self._config_entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
                     ),
-                ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300))
+                ): vol.All(vol.Coerce(int), vol.Range(min=MIN_POLL_INTERVAL, max=86400))
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
