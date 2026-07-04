@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
@@ -35,6 +36,23 @@ class OpenShockApiClient:
             "Accept": "application/json",
             "User-Agent": user_agent,
         }
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """Return a copy of the API headers."""
+        return dict(self._headers)
+
+    @property
+    def session(self) -> ClientSession:
+        """Return the shared aiohttp session."""
+        return self._session
+
+    @property
+    def signalr_user_hub_url(self) -> str:
+        """Return the SignalR user hub websocket URL."""
+        parsed = urlsplit(self._base_url)
+        scheme = "wss" if parsed.scheme == "https" else "ws"
+        return urlunsplit((scheme, parsed.netloc, "/1/hubs/user", "", ""))
 
     @staticmethod
     def _error_message(payload: Any, fallback: str) -> str:
