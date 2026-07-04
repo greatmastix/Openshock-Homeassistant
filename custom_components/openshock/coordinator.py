@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+from contextlib import suppress
 from datetime import timedelta
 from typing import Any
 
@@ -12,6 +15,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import OpenShockApiClient, OpenShockApiError
 from .const import DOMAIN
+from .signalr import OpenShockSignalRClient
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
@@ -32,6 +38,87 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         )
         self.api = api
         self._config_entry_id = config_entry_id
+        self._signalr_client: OpenShockSignalRClient | None = None
+        self._signalr_task = None
+
+    async def async_start_signalr(self) -> None:
+        """Start the OpenShock SignalR user hub listener."""
+        if self._signalr_task is not None:
+            return
+
+        self._signalr_client = OpenShockSignalRClient(
+            session=self.api.session,
+            url=self.api.signalr_user_hub_url,
+            headers=self.api.headers,
+            message_handler=self._async_handle_signalr_message,
+        )
+        self._signalr_task = self.hass.async_create_task(
+            self._signalr_client.run(),
+            name="openshock_signalr",
+        )
+
+    async def async_stop_signalr(self) -> None:
+        """Stop the OpenShock SignalR user hub listener."""
+        if self._signalr_client is not None:
+            self._signalr_client.stop()
+
+        if self._signalr_task is not None:
+            self._signalr_task.cancel()
+            with suppress(TimeoutError, asyncio.CancelledError):
+                await self._signalr_task
+            self._signalr_task = None
+
+        self._signalr_client = None
+
+    async def _async_handle_signalr_message(self, target: str, arguments: list[Any]) -> None:
+        """Handle server-to-client SignalR invocations."""
+        if target == "DeviceStatus":
+            self._async_apply_device_status(arguments)
+            return
+
+        if target == "DeviceUpdate":
+            await self.async_request_refresh()
+            return
+
+        _LOGGER.debug("Ignoring OpenShock SignalR message %s", target)
+
+    def _async_apply_device_status(self, arguments: list[Any]) -> None:
+        """Apply device online states from SignalR to existing shocker data."""
+        if not self.data or not arguments or not isinstance(arguments[0], list):
+            return
+
+        statuses: dict[str, dict[str, Any]] = {}
+        for state in arguments[0]:
+            if not isinstance(state, dict):
+                continue
+            device_id = state.get("deviceId") or state.get("id")
+            if device_id is not None:
+                statuses[str(device_id)] = state
+
+        if not statuses:
+            return
+
+        changed = False
+        updated_data: list[dict[str, Any]] = []
+        for shocker in self.data:
+            updated = dict(shocker)
+            hub_id = updated.get("hub_id") or updated.get("hubId") or updated.get("deviceId")
+            state = statuses.get(str(hub_id)) if hub_id is not None else None
+            if state is not None:
+                online = state.get("online")
+                if online is not None:
+                    status = "online" if online else "offline"
+                    if updated.get("status") != status:
+                        updated["status"] = status
+                        changed = True
+                firmware_version = state.get("firmwareVersion")
+                if firmware_version is not None and updated.get("firmwareVersion") != firmware_version:
+                    updated["firmwareVersion"] = firmware_version
+                    changed = True
+            updated_data.append(updated)
+
+        if changed:
+            self.async_set_updated_data(updated_data)
 
     @staticmethod
     def _extract_shocker_id(item: dict[str, Any]) -> str | None:
@@ -123,8 +210,3 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             return data
         except OpenShockApiError as err:
             raise UpdateFailed(str(err)) from err
-
-
-import logging
-
-_LOGGER = logging.getLogger(__name__)

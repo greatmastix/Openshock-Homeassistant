@@ -7,7 +7,7 @@
         "data": {
           "base_url": "API Base URL",
           "api_key": "API Key",
-          "poll_interval": "Polling interval (seconds)"
+          "poll_interval": "Polling interval (seconds, default 3600, minimum 300)"
         }
       }
     },
@@ -24,7 +24,7 @@
       "init": {
         "title": "OpenShock options",
         "data": {
-          "poll_interval": "Polling interval (seconds)"
+          "poll_interval": "Polling interval (seconds, default 3600, minimum 300)"
         }
       }
     }

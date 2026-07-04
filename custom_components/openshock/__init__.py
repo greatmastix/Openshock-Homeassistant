@@ -25,7 +25,9 @@ from .const import (
     DATA_DEFAULTS,
     DEFAULT_DURATION_MS,
     DEFAULT_INTENSITY,
+    DEFAULT_POLL_INTERVAL,
     DOMAIN,
+    MIN_POLL_INTERVAL,
     PLATFORMS,
     SERVICE_SEND_COMMAND,
     SERVICE_STOP_ALL,
@@ -68,14 +70,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api_key=entry.data[CONF_API_KEY],
     )
 
+    poll_interval = max(
+        MIN_POLL_INTERVAL,
+        entry.options.get(
+            CONF_POLL_INTERVAL,
+            entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+        ),
+    )
+
     coordinator = OpenShockDataCoordinator(
         hass=hass,
         api=api,
-        poll_interval=entry.options.get(CONF_POLL_INTERVAL, entry.data[CONF_POLL_INTERVAL]),
+        poll_interval=poll_interval,
         config_entry_id=entry.entry_id,
     )
     await coordinator.async_config_entry_first_refresh()
     await coordinator.async_prune_stale_registry_entries()
+    await coordinator.async_start_signalr()
 
     entry.runtime_data = {DATA_COORDINATOR: coordinator, DATA_DEFAULTS: {}}
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -135,5 +146,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unloaded and len(hass.config_entries.async_entries(DOMAIN)) <= 1:
         hass.services.async_remove(DOMAIN, SERVICE_SEND_COMMAND)
         hass.services.async_remove(DOMAIN, SERVICE_STOP_ALL)
+
+    if unloaded:
+        await entry.runtime_data[DATA_COORDINATOR].async_stop_signalr()
 
     return unloaded
