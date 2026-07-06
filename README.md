@@ -2,6 +2,8 @@
 
 Simple custom integration to control OpenShock shockers from Home Assistant.
 
+[![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=greatmastix&repository=Openshock-Homeassistant&category=integration)
+
 ## What it adds
 
 - **One device per shocker** (hubs are only used for discovery)
