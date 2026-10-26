@@ -52,7 +52,10 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             headers=self.api.headers,
             message_handler=self._async_handle_signalr_message,
         )
-        self._signalr_task = self.hass.async_create_task(
+        # Background task: a tracked task would block HA startup while the loop runs.
+        entry = self.hass.config_entries.async_get_entry(self._config_entry_id)
+        self._signalr_task = entry.async_create_background_task(
+            self.hass,
             self._signalr_client.run(),
             name="openshock_signalr",
         )

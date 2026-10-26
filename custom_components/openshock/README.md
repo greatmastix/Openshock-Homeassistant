@@ -19,6 +19,11 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 3. Go to **Settings → Devices & Services → Add Integration → OpenShock**.
 4. Enter your OpenShock API base URL and API token.
 
+## Changelog
+
+### Version 0.2.6
+- Improved (Home Assistant) boot up and restart time (changed the first connect to a background task plus timeout reduced from 300s to 15s; will reconnect if the first connect fails)
+
 ## Disclosure
 
 This project/integration scaffold was created with assistance from AI and then iterated based on real-device user feedback.
