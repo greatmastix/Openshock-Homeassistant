@@ -9,6 +9,9 @@ from uuid import UUID
 from aiohttp import ClientError, ClientResponseError, ClientSession, ClientTimeout
 
 REQUEST_TIMEOUT = 15
+USER_AGENT_PRODUCT = "OpenShock-HomeAssistant"
+
+AUTH_ERROR_STATUSES = frozenset({401, 403})
 
 
 class OpenShockApiError(Exception):
@@ -17,6 +20,21 @@ class OpenShockApiError(Exception):
     def __init__(self, message: str, *, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status
+
+    @property
+    def can_try_other_endpoint(self) -> bool:
+        """Return True if the server rejected the request without acting on it.
+
+        Only a 4xx response (other than an auth error) proves that. Timeouts,
+        connection errors and 5xx responses are ambiguous: a control request may
+        still have reached the shocker, so resending it to another endpoint could
+        deliver the same shock twice.
+        """
+        return (
+            self.status is not None
+            and 400 <= self.status < 500
+            and self.status not in AUTH_ERROR_STATUSES
+        )
 
 
 class OpenShockApiClient:
@@ -27,7 +45,7 @@ class OpenShockApiClient:
         session: ClientSession,
         base_url: str,
         api_key: str,
-        user_agent: str = "OpenShock-HomeAssistant/0.2.2",
+        user_agent: str = USER_AGENT_PRODUCT,
     ) -> None:
         self._session = session
         self._base_url = base_url.rstrip("/")
@@ -153,11 +171,15 @@ class OpenShockApiClient:
         for path in ("/1/shockers/own", "/1/shockers", "/shockers"):
             try:
                 payload = await self._request("GET", path)
-                shockers = self._normalize_shockers(payload)
-                if shockers:
-                    return shockers
             except OpenShockApiError as err:
+                if not err.can_try_other_endpoint:
+                    raise
                 last_exc = err
+                continue
+
+            shockers = self._normalize_shockers(payload)
+            if shockers:
+                return shockers
 
         if last_exc:
             raise last_exc
@@ -200,6 +222,9 @@ class OpenShockApiClient:
                 await self._request("POST", path, json_body=payload)
                 return
             except OpenShockApiError as err:
+                # Never resend a command after a timeout or server error.
+                if not err.can_try_other_endpoint:
+                    raise
                 last_exc = err
 
         if last_exc:

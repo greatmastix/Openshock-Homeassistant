@@ -8,17 +8,28 @@ Simple custom integration to control OpenShock shockers from Home Assistant.
 
 - **One device per shocker** (hubs are only used for discovery)
 - Command buttons: **Shock**, **Vibrate**, **Sound**, **Stop**
+- Device automation action: **Shock**, **Beep**, **Vibrate** with duration/intensity inputs
 - Per-shocker defaults: **Intensity** and **Duration**
+- Live device online/offline status via the OpenShock SignalR hub
 - Services:
-  - `openshock.send_command`
-  - `openshock.stop_all`
+  - `openshock.send_command` (accepts either `device_id` or `shocker_id`)
+  - `openshock.stop_all` (stops every shocker on every configured account)
+
+## Requirements
+
+- Home Assistant **2025.3** or newer
 
 ## Install
 
-1. Copy `custom_components/openshock` into your Home Assistant `custom_components` folder.
+1. Install via HACS using the button above, or copy `custom_components/openshock` into your Home Assistant `custom_components` folder.
 2. Restart Home Assistant.
 3. Go to **Settings → Devices & Services → Add Integration → OpenShock**.
 4. Enter your OpenShock API base URL and API token.
+
+## Configuration
+
+- **Polling interval:** open the integration's **Configure** menu. Changes apply immediately (the integration reloads).
+- **API URL or token:** use **Reconfigure** from the integration's menu. Leave the token empty to keep the current one.
 
 ## Example Home Assistant Dashboard
 
@@ -111,6 +122,10 @@ cards:
 - If setup fails, verify your API base URL is correct.
 - API auth follows OpenShock token headers (`OpenShockToken` / `Open-Shock-Token`) and uses the V2 control endpoint first.
 - Sound actions use OpenShock `Sound` control type (`beep` is accepted as alias).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Disclosure
 

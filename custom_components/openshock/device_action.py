@@ -104,6 +104,7 @@ async def async_call_action_from_config(
         SERVICE_SEND_COMMAND,
         {
             ATTR_SHOCKER_ID: shocker_id,
+            CONF_DEVICE_ID: config[CONF_DEVICE_ID],
             ATTR_COMMAND: TYPE_TO_COMMAND[config["command_type"]],
             ATTR_INTENSITY: config[ATTR_INTENSITY],
             ATTR_DURATION_MS: config[ATTR_DURATION_MS],
