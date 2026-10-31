@@ -7,10 +7,10 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.config_entries import ConfigFlowResult
 
-from .api import OpenShockApiClient, OpenShockApiError
+from . import async_create_api_client
+from .api import AUTH_ERROR_STATUSES, OpenShockApiError
 from .const import (
     CONF_API_KEY,
     CONF_BASE_URL,
@@ -27,26 +27,26 @@ class OpenShockConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def _async_validate_input(self, base_url: str, api_key: str) -> dict[str, str]:
+        """Try the credentials against the API and return form errors, if any."""
+        api = await async_create_api_client(self.hass, base_url, api_key)
+        try:
+            await api.test_connection()
+        except OpenShockApiError as err:
+            if err.status in AUTH_ERROR_STATUSES:
+                return {"base": "invalid_auth"}
+            return {"base": "cannot_connect"}
+        return {}
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
 
         if user_input is not None:
             await self.async_set_unique_id(f"openshock::{user_input[CONF_BASE_URL]}")
             self._abort_if_unique_id_configured()
 
-            api = OpenShockApiClient(
-                session=async_get_clientsession(self.hass),
-                base_url=user_input[CONF_BASE_URL],
-                api_key=user_input[CONF_API_KEY],
-            )
-            try:
-                await api.test_connection()
-            except OpenShockApiError as err:
-                if err.status in (401, 403):
-                    errors["base"] = "invalid_auth"
-                else:
-                    errors["base"] = "cannot_connect"
-            else:
+            errors = await self._async_validate_input(user_input[CONF_BASE_URL], user_input[CONF_API_KEY])
+            if not errors:
                 return self.async_create_entry(title="OpenShock", data=user_input)
 
         schema = vol.Schema(
@@ -67,8 +67,40 @@ class OpenShockConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Return the options flow for this handler."""
         return OpenShockOptionsFlow(config_entry)
 
-    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        return await self.async_step_user(user_input)
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Change the API URL or token of an existing entry."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            base_url = user_input[CONF_BASE_URL]
+            # An empty token field keeps the current token.
+            api_key = user_input.get(CONF_API_KEY) or entry.data[CONF_API_KEY]
+            unique_id = f"openshock::{base_url}"
+
+            if any(
+                other.entry_id != entry.entry_id and other.unique_id == unique_id
+                for other in self._async_current_entries()
+            ):
+                return self.async_abort(reason="already_configured")
+
+            errors = await self._async_validate_input(base_url, api_key)
+            if not errors:
+                # The update listener in __init__.py reloads the entry with the new data.
+                self.hass.config_entries.async_update_entry(
+                    entry,
+                    unique_id=unique_id,
+                    data={**entry.data, CONF_BASE_URL: base_url, CONF_API_KEY: api_key},
+                )
+                return self.async_abort(reason="reconfigure_successful")
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_BASE_URL, default=entry.data[CONF_BASE_URL]): str,
+                vol.Optional(CONF_API_KEY): str,
+            }
+        )
+        return self.async_show_form(step_id="reconfigure", data_schema=schema, errors=errors)
 
 
 class OpenShockOptionsFlow(config_entries.OptionsFlow):
@@ -77,7 +109,7 @@ class OpenShockOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 

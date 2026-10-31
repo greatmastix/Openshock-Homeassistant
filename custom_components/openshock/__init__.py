@@ -2,73 +2,51 @@
 
 from __future__ import annotations
 
-import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_DEVICE_ID
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
-from .api import OpenShockApiClient, OpenShockApiError
+from .api import USER_AGENT_PRODUCT, OpenShockApiClient
 from .const import (
-    ATTR_COMMAND,
-    ATTR_DURATION_MS,
-    ATTR_INTENSITY,
-    ATTR_SHOCKER_ID,
-    COMMAND_STOP,
     CONF_API_KEY,
     CONF_BASE_URL,
     CONF_POLL_INTERVAL,
     DATA_COORDINATOR,
     DATA_DEFAULTS,
-    DEFAULT_DURATION_MS,
-    DEFAULT_INTENSITY,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     MIN_POLL_INTERVAL,
     PLATFORMS,
-    SERVICE_SEND_COMMAND,
-    SERVICE_STOP_ALL,
-    VALID_COMMANDS,
 )
 from .coordinator import OpenShockDataCoordinator
+from .services import async_setup_services
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
-
-def _resolve_shocker_id_from_device(hass: HomeAssistant, device_id: str) -> str | None:
-    """Resolve OpenShock shocker id from a Home Assistant device id."""
-    device = dr.async_get(hass).async_get(device_id)
-    if device is None:
-        return None
-
-    for identifier_domain, identifier_id in device.identifiers:
-        if identifier_domain == DOMAIN:
-            return identifier_id
-
-    return None
+async def async_create_api_client(hass: HomeAssistant, base_url: str, api_key: str) -> OpenShockApiClient:
+    """Create an API client whose User-Agent carries the installed integration version."""
+    integration = await async_get_integration(hass, DOMAIN)
+    return OpenShockApiClient(
+        session=async_get_clientsession(hass),
+        base_url=base_url,
+        api_key=api_key,
+        user_agent=f"{USER_AGENT_PRODUCT}/{integration.version}",
+    )
 
 
-SEND_COMMAND_SCHEMA = vol.Schema(
-    {
-        vol.Optional(ATTR_SHOCKER_ID): cv.string,
-        vol.Optional(CONF_DEVICE_ID): cv.string,
-        vol.Required(ATTR_COMMAND): vol.In(VALID_COMMANDS),
-        vol.Optional(ATTR_INTENSITY): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
-        vol.Optional(ATTR_DURATION_MS): vol.All(vol.Coerce(int), vol.Range(min=100, max=30000)),
-    }
-)
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the OpenShock integration (service actions are shared by all accounts)."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up OpenShock from a config entry."""
-    session = async_get_clientsession(hass)
-    api = OpenShockApiClient(
-        session=session,
-        base_url=entry.data[CONF_BASE_URL],
-        api_key=entry.data[CONF_API_KEY],
-    )
+    api = await async_create_api_client(hass, entry.data[CONF_BASE_URL], entry.data[CONF_API_KEY])
 
     poll_interval = max(
         MIN_POLL_INTERVAL,
@@ -82,70 +60,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass=hass,
         api=api,
         poll_interval=poll_interval,
-        config_entry_id=entry.entry_id,
+        config_entry=entry,
     )
     await coordinator.async_config_entry_first_refresh()
     await coordinator.async_prune_stale_registry_entries()
     await coordinator.async_start_signalr()
 
     entry.runtime_data = {DATA_COORDINATOR: coordinator, DATA_DEFAULTS: {}}
+    # Reload when the entry changes (options flow or reconfigure) so new settings apply.
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    async def async_send_command(call: ServiceCall) -> None:
-        shocker_id = call.data.get(ATTR_SHOCKER_ID)
-        if shocker_id is None and (device_id := call.data.get(CONF_DEVICE_ID)) is not None:
-            shocker_id = _resolve_shocker_id_from_device(hass, device_id)
-
-        if shocker_id is None:
-            raise HomeAssistantError("Provide shocker_id or device_id for openshock.send_command")
-
-        command = call.data[ATTR_COMMAND]
-
-        defaults = entry.runtime_data[DATA_DEFAULTS].get(shocker_id, {})
-        intensity = call.data.get(ATTR_INTENSITY, defaults.get(ATTR_INTENSITY, DEFAULT_INTENSITY))
-        duration_ms = call.data.get(ATTR_DURATION_MS, defaults.get(ATTR_DURATION_MS, DEFAULT_DURATION_MS))
-
-        if command == COMMAND_STOP:
-            intensity = None
-            duration_ms = None
-
-        try:
-            await api.send_command(
-                shocker_id=shocker_id,
-                command=command,
-                intensity=intensity,
-                duration_ms=duration_ms,
-            )
-        except OpenShockApiError as err:
-            raise HomeAssistantError(str(err)) from err
-
-    async def async_stop_all(_: ServiceCall) -> None:
-        try:
-            await api.stop_all()
-        except OpenShockApiError as err:
-            raise HomeAssistantError(str(err)) from err
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SEND_COMMAND):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SEND_COMMAND,
-            async_send_command,
-            schema=SEND_COMMAND_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_STOP_ALL):
-        hass.services.async_register(DOMAIN, SERVICE_STOP_ALL, async_stop_all)
-
     return True
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the config entry after its data or options were updated."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload OpenShock config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-    if unloaded and len(hass.config_entries.async_entries(DOMAIN)) <= 1:
-        hass.services.async_remove(DOMAIN, SERVICE_SEND_COMMAND)
-        hass.services.async_remove(DOMAIN, SERVICE_STOP_ALL)
 
     if unloaded:
         await entry.runtime_data[DATA_COORDINATOR].async_stop_signalr()
