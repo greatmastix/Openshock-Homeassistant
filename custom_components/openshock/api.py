@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
@@ -231,14 +232,45 @@ class OpenShockApiClient:
             raise last_exc
 
     async def stop_all(self) -> None:
-        """Stop all owned shockers."""
-        shockers = await self.get_shockers()
-        for shocker in shockers:
-            shocker_id = self._extract_shocker_id(shocker)
-            if shocker_id:
-                await self.send_command(
+        """Stop all owned shockers.
+
+        The stop is sent to every shocker, concurrently, even if some of them
+        fail (e.g. one hub is offline), so one failure cannot leave the other
+        shockers running. Afterwards a single OpenShockApiError names every
+        shocker that could not be stopped.
+        """
+        # Shocker id -> label for error messages. Keyed by id so a shocker
+        # listed twice is only sent one stop.
+        targets: dict[str, str] = {}
+        for shocker in await self.get_shockers():
+            if (shocker_id := self._extract_shocker_id(shocker)) is None:
+                continue
+            name = shocker.get("name") or shocker.get("label")
+            targets.setdefault(shocker_id, f"{name} ({shocker_id})" if name else shocker_id)
+
+        results = await asyncio.gather(
+            *(
+                self.send_command(
                     shocker_id=shocker_id,
                     command="stop",
                     intensity=None,
                     duration_ms=None,
                 )
+                for shocker_id in targets
+            ),
+            return_exceptions=True,
+        )
+
+        failures: list[str] = []
+        for label, result in zip(targets.values(), results):
+            if isinstance(result, OpenShockApiError):
+                failures.append(f"{label}: {result}")
+            elif isinstance(result, BaseException):
+                # Not an API failure (e.g. a bug); every stop has already been sent.
+                raise result
+
+        if failures:
+            raise OpenShockApiError(
+                f"Stop failed for {len(failures)} of {len(targets)} shockers: "
+                + ", ".join(failures)
+            )
