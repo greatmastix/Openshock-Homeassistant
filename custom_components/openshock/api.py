@@ -6,7 +6,9 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
-from aiohttp import ClientError, ClientResponseError, ClientSession
+from aiohttp import ClientError, ClientResponseError, ClientSession, ClientTimeout
+
+REQUEST_TIMEOUT = 15
 
 
 class OpenShockApiError(Exception):
@@ -72,7 +74,7 @@ class OpenShockApiClient:
     async def _request(self, method: str, path: str, *, json_body: dict[str, Any] | None = None) -> Any:
         url = f"{self._base_url}{path}"
         try:
-            async with self._session.request(method, url, headers=self._headers, json=json_body) as resp:
+            async with self._session.request(method, url, headers=self._headers, json=json_body, timeout=ClientTimeout(total=REQUEST_TIMEOUT)) as resp:
                 content_type = (resp.content_type or "").lower()
                 if "json" in content_type:
                     payload: Any = await resp.json(content_type=None)
@@ -86,8 +88,8 @@ class OpenShockApiClient:
                 return payload
         except ClientResponseError as err:
             raise OpenShockApiError(f"Request failed for {path}: {err}", status=err.status) from err
-        except ClientError as err:
-            raise OpenShockApiError(f"Request failed for {path}: {err}") from err
+        except (ClientError, TimeoutError) as err:
+            raise OpenShockApiError(f"Request failed for {path}: {err!r}") from err
 
     async def test_connection(self) -> None:
         await self.get_shockers()

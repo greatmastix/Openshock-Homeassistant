@@ -8,7 +8,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from aiohttp import ClientError, ClientSession, WSMsgType
+from aiohttp import ClientError, ClientSession, ClientWSTimeout, WSMsgType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class OpenShockSignalRClient:
             self._url,
             headers=self._headers,
             heartbeat=30,
+            timeout=ClientWSTimeout(ws_close=10),
         ) as ws:
             await ws.send_str(json.dumps({"protocol": "json", "version": 1}) + SIGNALR_RECORD_SEPARATOR)
 
