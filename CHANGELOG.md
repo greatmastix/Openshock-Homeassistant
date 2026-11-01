@@ -3,6 +3,7 @@
 ## 0.2.7
 
 - **Safety:** a control command that times out or gets a server error is no longer resent to the fallback API endpoint, which could deliver the same shock twice. Fallback now happens only when the server rejected the request outright.
+- **Safety:** `openshock.stop_all` now sends the stop to every shocker even if some of them fail (e.g. one hub is offline). Previously the first failure ended the loop and the remaining shockers were never stopped. The service call still reports an error naming each shocker that could not be stopped.
 - Authentication errors are reported immediately instead of first trying the fallback endpoints.
 - Added `translations/en.json` so setup and options forms show proper labels and error messages.
 - Changing the polling interval in the options now takes effect without restarting Home Assistant.
