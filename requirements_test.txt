@@ -1,0 +1,4 @@
+# Tests run against the Home Assistant release this package pins. To test the
+# minimum supported version, install pytest-homeassistant-custom-component==0.13.221
+# (Home Assistant 2025.3.0) instead.
+pytest-homeassistant-custom-component

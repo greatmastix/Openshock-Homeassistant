@@ -153,22 +153,12 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 entity_registry.async_remove(entry.entity_id)
 
         device_registry = dr.async_get(self.hass)
-        for device in list(device_registry.devices.values()):
-            if self._config_entry_id not in device.config_entries:
-                continue
-
+        for device in dr.async_entries_for_config_entry(device_registry, self._config_entry_id):
             if any((DOMAIN, shocker_id) in device.identifiers for shocker_id in removed_ids):
-                has_remaining_entities = any(
-                    entity.device_id == device.id and entity.config_entry_id == self._config_entry_id
-                    for entity in entity_registry.entities.values()
-                )
-                if has_remaining_entities:
-                    device_registry.async_update_device(
-                        device_id=device.id,
-                        remove_config_entry_id=self._config_entry_id,
-                    )
-                else:
-                    device_registry.async_remove_device(device.id)
+                # This also removes any entities still attached to the device. Detaching
+                # the config entry with the deprecated `remove_config_entry_id` would
+                # delete the device too, as it is the device's only config entry.
+                device_registry.async_remove_device(device.id)
 
     async def async_prune_stale_registry_entries(self) -> None:
         """Prune stale entities/devices after startup reloads."""
@@ -181,9 +171,8 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         device_registry = dr.async_get(self.hass)
         stale_device_ids = {
             device.id
-            for device in device_registry.devices.values()
-            if self._config_entry_id in device.config_entries
-            and any(identifier[0] == DOMAIN and identifier[1] not in current_ids for identifier in device.identifiers)
+            for device in dr.async_entries_for_config_entry(device_registry, self._config_entry_id)
+            if any(identifier[0] == DOMAIN and identifier[1] not in current_ids for identifier in device.identifiers)
         }
 
         if not stale_device_ids:
