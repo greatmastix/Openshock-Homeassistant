@@ -3,15 +3,21 @@ send_command:
   description: Send a command to a specific OpenShock shocker.
   fields:
     device_id:
+      name: Device
+      description: The OpenShock shocker device to control. Use this or the shocker ID.
       required: false
       selector:
         device:
           integration: openshock
     shocker_id:
+      name: Shocker ID
+      description: The OpenShock shocker UUID. Use this or the device.
       required: false
       selector:
         text:
     command:
+      name: Command
+      description: The command to send.
       required: true
       selector:
         select:
@@ -21,6 +27,8 @@ send_command:
             - sound
             - stop
     intensity:
+      name: Intensity
+      description: Intensity from 1 to 100. Defaults to the shocker's Intensity setting.
       required: false
       selector:
         number:
@@ -28,14 +36,17 @@ send_command:
           max: 100
           mode: slider
     duration_ms:
+      name: Duration
+      description: Duration in milliseconds. Defaults to the shocker's Duration setting.
       required: false
       selector:
         number:
           min: 100
           max: 30000
           step: 100
+          unit_of_measurement: ms
           mode: box
 
 stop_all:
   name: Stop all
-  description: Send an immediate stop command to all OpenShock shockers.
+  description: Send an immediate stop command to all shockers of every configured OpenShock account.

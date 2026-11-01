@@ -8,6 +8,7 @@ from contextlib import suppress
 from datetime import timedelta
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -28,16 +29,17 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         hass: HomeAssistant,
         api: OpenShockApiClient,
         poll_interval: int,
-        config_entry_id: str,
+        config_entry: ConfigEntry,
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="OpenShock",
             update_interval=timedelta(seconds=poll_interval),
         )
         self.api = api
-        self._config_entry_id = config_entry_id
+        self._config_entry_id = config_entry.entry_id
         self._signalr_client: OpenShockSignalRClient | None = None
         self._signalr_task = None
 
@@ -53,8 +55,7 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             message_handler=self._async_handle_signalr_message,
         )
         # Background task: a tracked task would block HA startup while the loop runs.
-        entry = self.hass.config_entries.async_get_entry(self._config_entry_id)
-        self._signalr_task = entry.async_create_background_task(
+        self._signalr_task = self.config_entry.async_create_background_task(
             self.hass,
             self._signalr_client.run(),
             name="openshock_signalr",
@@ -130,6 +131,10 @@ class OpenShockDataCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             if value:
                 return str(value)
         return None
+
+    def has_shocker(self, shocker_id: str) -> bool:
+        """Return True if this account currently lists the given shocker."""
+        return any(self._extract_shocker_id(item) == shocker_id for item in (self.data or []))
 
     async def _async_remove_deleted_shocker_entities(self, removed_ids: set[str]) -> None:
         """Remove entities/devices for shockers that no longer exist."""

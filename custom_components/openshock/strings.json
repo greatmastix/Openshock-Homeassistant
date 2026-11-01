@@ -8,6 +8,20 @@
           "base_url": "API Base URL",
           "api_key": "API Key",
           "poll_interval": "Polling interval (seconds, default 3600, minimum 300)"
+        },
+        "data_description": {
+          "api_key": "An API token created in the OpenShock web app (not your account password)."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure OpenShock",
+        "description": "Change the API base URL or API token of this OpenShock account.",
+        "data": {
+          "base_url": "API Base URL",
+          "api_key": "API Key"
+        },
+        "data_description": {
+          "api_key": "Leave empty to keep the current token."
         }
       }
     },
@@ -16,7 +30,8 @@
       "invalid_auth": "Authentication failed (check API token)"
     },
     "abort": {
-      "already_configured": "This OpenShock endpoint is already configured"
+      "already_configured": "This OpenShock endpoint is already configured",
+      "reconfigure_successful": "OpenShock was reconfigured successfully"
     }
   },
   "options": {
